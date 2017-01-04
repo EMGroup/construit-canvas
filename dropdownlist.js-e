@@ -1,0 +1,160 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+DropDownList = function (name, values, labels, x, y, enabled) {
+	this.name = name;
+	this.obsName = root.currentObservableName();
+	this.values = values;
+	this.labels = labels;
+	this.x = x;
+	this.y = y;
+	this.enabled = enabled;
+}
+
+DropDownList.prototype.hash = function () {
+	return this.name+"$$"+
+				(Array.isArray(this.values)? this.values.join("$$") : "") +
+				(Array.isArray(this.labels)? this.labels.join("$$") : "") +
+				this.x+"$$"+
+				this.y+"$$"+
+				this.enabled;
+};
+
+}}$;
+
+
+/**
+ * Creates a DropDown list, allowing for the selection
+ * @param [name] Prefix for _value observable. Default is the name of the observable being defined.
+ * @param values A list of options
+ * @param [labels] A list of labels to display, if not supplied, the list of values will be used
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param [enabled] Boolean to determine if list selection is enabled
+ * #canvas #dropdown #input #select
+ */
+func DropDownList { ${{
+	var argsProcesed;
+
+	var name;
+	if (typeof(arguments[0]) == "string") {
+		name = arguments[0];
+		argsProcessed = 1;
+	} else {
+		name = root.currentObservableName();
+		argsProcessed = 0;
+		if (name === undefined) {
+			eden.error(new Error("DropDownList: Every DropDownList must have a name."), "error");
+			return undefined;
+		}
+	}
+
+	var values = arguments[argsProcessed];
+	argsProcessed++;
+	var labels;
+	if (Array.isArray(arguments[argsProcessed])) {
+		labels = arguments[argsProcessed];
+		argsProcessed++;
+	} else {
+		labels = values;
+	}
+	var x = arguments[argsProcessed];
+	argsProcessed++;
+	var y = arguments[argsProcessed];
+	argsProcessed++;
+	var enabled = arguments[argsProcessed];
+
+	return new DropDownList(name, values, labels, x, y, enabled);
+}}$; }
+
+
+${{
+
+DropDownList.prototype.makeOptionsHTML = function() {
+	var html = "";
+	for (var i = 0; i < this.values.length; i++) {
+		html = html + '\n<option value="' + this.values[i] + '">' + this.labels[i] + '</option>';
+	}
+	return html;
+}
+
+DropDownList.prototype.draw = function(context) {
+	var dropDownList;
+	var me = this;
+	var name = this.name;
+	var valueSym = root.lookup(name + '_value');
+
+	if (this.elements === undefined) {
+
+		var disabled = this.enabled === false? 'disabled="disabled"' : '';
+		var dropDownListJQ = $('<select ' + disabled + ' class="canvashtml-item"></select>');
+		dropDownListJQ.html(this.makeOptionsHTML(this.values));
+
+		dropDownList = dropDownListJQ.get(0);
+		var initialValue = valueSym.value();
+		if (initialValue === undefined) {
+			valueSym.assign(me.values[0], root.scope, root.lookup("DropDownList"), true);
+		} else {
+			dropDownList.value = initialValue;
+		}
+		valueSym.addJSObserver("updateDropDownList", function (symbol, value) {
+			dropDownList.value = value;
+		});
+
+		dropDownListJQ.change(function(event) {
+			valueSym.assign(event.target.value, root.scope, Symbol.hciAgent, true);
+		})
+		.on("mousedown", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseDownZone").assign(undefined, root.scope, Symbol.hciAgent, mouseFollow);
+		})
+		.on("mouseup", function () {
+			edenUI.plugins.Canvas2D.endClick();
+		})
+		.on("mouseenter", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseZone").assign(name, root.scope, Symbol.hciAgent, mouseFollow);
+		});
+
+		this.elements = [dropDownList];
+
+	} else {
+
+		//Case when the user has performed direct assignment to one or more JavaScript properties.
+		dropDownList = this.elements[0];
+		$(dropDownList).html(this.makeOptionsHTML());
+
+		dropDownList.value = valueSym.value();
+
+		if (this.enabled === false) { 
+			dropDownList.disabled = true;
+		} else {
+			dropDownList.disabled = false;
+		}
+
+	}
+};
+
+DropDownList.prototype.scale = function (scale, zoom, origin) {
+	var style = this.elements[0].style;
+	style.left = Math.round((this.x + origin.x) * scale) + "px";
+	style.top =  Math.round((this.y + origin.y) * scale) + "px";
+	style.fontSize = zoom + "em";
+};
+
+DropDownList.prototype.toString = function() {
+	if (this.name == this.obsName) {
+		return "DropDownList(" + Eden.edenCodeForValues(this.values, this.labels, this.x,
+			this.y, this.enabled) + ")";
+	} else {
+		return "DropDownList(" + Eden.edenCodeForValues(this.name, this.values, this.labels, this.x,
+			this.y, this.enabled) + ")";
+	}
+};
+
+DropDownList.prototype.getEdenCode = DropDownList.prototype.toString;
+
+}}$;

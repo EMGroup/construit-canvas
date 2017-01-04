@@ -1,0 +1,212 @@
+## Copyright (c) 2015, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+
+	Rotation = function (angle, centre, origin, angle2, radius, items) {
+		this.angle = angle;
+		this.centre = centre;
+		this.origin = origin;
+		this.angle2 = angle2;
+		this.radius = radius;
+		this.items = items;
+
+		var radiansPerUnit = Math.PI / root.lookup("semicircleAngle").value();
+		if (angle2 === undefined) {
+			this.radians2 = 0;
+		} else {
+			this.radians2 = -angle2 * radiansPerUnit;
+		}
+		if (angle === undefined) {
+			this.radians = 0;
+		} else {
+			this.radians = -angle * radiansPerUnit - this.radians2;
+		}
+	}
+
+	Rotation.prototype = new EdenUI.plugins.Canvas2D.Transform();
+	
+	Rotation.prototype.transform = function (context) {
+		var origin = this.origin;
+		var centre = this.centre;
+		var radius = this.radius;
+
+		context.translate(origin.x, origin.y);
+
+		if (radius !== undefined) {
+			context.rotate(this.radians2);
+			context.translate(radius, 0);
+		}
+		context.rotate(this.radians);
+
+		if (centre !== undefined) {
+			context.translate(-centre.x, -centre.y);
+		}
+	}
+
+	Rotation.prototype.getCSS = function (scale) {
+		var origin = this.origin;
+		var centre = this.centre;
+		var radius = this.radius;
+
+		var css, x, y, theta;
+
+		x = origin.x * scale;
+		y = origin.y * scale;
+		css = "translate(" + x + "px, " + y + "px) ";
+
+		if (radius !== undefined) {
+			theta = this.radians2;
+			x = radius * scale;
+			css = css +  "rotate(" + theta + "rad) translateX(" + x + "px) ";
+		}
+
+		theta = this.radians;
+		css = css + "rotate(" + theta + "rad) ";
+
+		if (centre !== undefined) {
+			x = -centre.x * scale;
+			y = -centre.y * scale;
+			css = css + "translate(" + x + "px, " + y + "px)";
+		}
+
+		return css;
+	}
+
+	Rotation.prototype.inverse = function (x, y) {
+		var origin = this.origin;
+		var centre = this.centre;
+		var radius = this.radius;
+
+		var invX = x - origin.x;
+		var invY = y - origin.y;
+		var temp, sin, cos;
+
+		if (radius !== undefined) {
+			sin = Math.sin(-this.radians2);
+			cos = Math.cos(-this.radians2);
+			temp = invX;
+			invX = cos * invX - sin * invY;
+			invY = sin * temp + cos * invY;
+			invX = invX - radius;
+		}
+
+		sin = Math.sin(-this.radians);
+		cos = Math.cos(-this.radians);
+		temp = invX;
+		invX = cos * invX - sin * invY;
+		invY = sin * temp + cos * invY;
+
+		if (centre !== undefined) {
+			invX = invX + centre.x;
+			invY = invY + centre.y;
+		}
+		return new Point(invX, invY);
+	}
+
+	Rotation.prototype.toString = function() {
+		if (this.radius !== undefined && this.centre !== undefined) {
+			return "CombinedRotation(" + Eden.edenCodeForValues(this.angle, this.centre, this.origin, this.angle2, this.radius, this.items) + ")";
+		} else if (this.radius !== undefined) {
+			return "RotateAboutPoint(" + Eden.edenCodeForValues(this.angle2, this.origin, this.radius, this.items) + ")";
+		} else {
+			return "RotateAboutCentre(" + Eden.edenCodeForValues(this.angle, this.centre, this.origin, this.items) + ")";
+		}
+	}
+
+	Rotation.prototype.getEdenCode = Rotation.prototype.toString;
+
+}}$;
+
+func CombinedRotation {
+	${{
+		if (arguments[0] instanceof Folder) {
+			//Probably not an actual function call but semicircleAngle observable changed.
+			return undefined;
+		}
+
+		var angle, centre, origin, angle2, radius, items;
+		angle = arguments[0];
+		centre = arguments[1];
+		origin = arguments[2];
+
+		if (arguments.length == 6) {
+			angle2 = arguments[3];
+			radius = arguments[4];
+			items = arguments[5];
+		} else {
+			angle2 = angle;
+			radius = arguments[3];
+			items = arguments[4];		
+		}
+
+		if (!(centre instanceof Point)) {
+			eden.error(new Error("CombinedRotation: The centre of rotation must be a Point, not a " + typeof(centre)), "error");
+			return undefined;
+		}
+		if (!(origin instanceof Point)) {
+			eden.error(new Error("CombinedRotation: The centre of the circular orbit must be a Point, not a " + typeof(origin)), "error");
+			return undefined;
+		}
+		return new Rotation(angle, centre, origin, angle2, radius, items);
+	}}$;
+}
+
+func RotateAboutCentre {
+	${{
+		if (arguments[0] instanceof Folder) {
+			//Probably not an actual function call but semicircleAngle observable changed.
+			return undefined;
+		}
+
+		var angle = arguments[0];
+		var centre = arguments[1];
+		var origin = arguments[2];
+		var items = arguments[3];
+
+		if (!(centre instanceof Point)) {
+			eden.error(new Error("RotateAboutCentre: The centre of rotation must be a Point, not a " + typeof(centre)), "error");
+			return undefined;
+		}
+		if (!(origin instanceof Point)) {
+			eden.error(new Error("RotateAboutCentre: The destination position must be a Point, not a " + typeof(origin)), "error");
+			return undefined;
+		}
+		return new Rotation(angle, centre, origin, 0, undefined, items);
+	}}$;
+}
+
+func RotateAboutPoint {
+	${{
+		if (arguments[0] instanceof Folder) {
+			//Probably not an actual function call but semicircleAngle observable changed.
+			return undefined;
+		}
+
+		var angle, origin, radius, centre, items;
+		angle = arguments[0];
+		origin = arguments[1];
+		radius = arguments[2];
+
+		if (arguments.length == 5) {
+			centre = arguments[3];
+			items = arguments[4];
+			if (!(centre instanceof Point)) {
+				eden.error(new Error("RotateAboutPoint: The centre point of the source picture must be a Point, not a " + typeof(centre)), "error");
+				return undefined;
+			}
+		} else {
+			items = arguments[3];
+		}
+
+		if (!(origin instanceof Point)) {
+			eden.error(new Error("RotateAboutPoint: The centre of the circle must be a Point, not a " + typeof(origin)), "error");
+			return undefined;
+		}
+		return new Rotation(0, centre, origin, angle, radius, items);
+	}}$;
+}
+
+semicircleAngle ~> [CombinedRotation, RotateAboutCentre, RotateAboutPoint];

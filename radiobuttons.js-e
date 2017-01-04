@@ -1,0 +1,179 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+RadioButtons = function (name, values, labels, x, y, width, horizontal, enabled) {
+	this.name = name;
+	this.obsName = root.currentObservableName();
+	this.values = values;
+	this.labels = labels;
+	this.x = x;
+	this.y = y;
+	this.width = width;
+	this.horizontal = horizontal;
+    this.enabled = enabled;
+}
+
+RadioButtons.prototype.hash = function () {
+	return this.name+"$$"+
+				(Array.isArray(this.values)? this.values.join("$$") : "") +
+				(Array.isArray(this.labels)? this.labels.join("$$") : "") +
+				this.x+"$$"+
+				this.y+"$$"+
+				this.width+"$$"+
+				this.horizontal+"$$"+
+				this.enabled
+};
+}}$;
+
+/**
+ * Generates a set of radio buttons
+ * 
+ * @param [name] Prefix for _value observable.  Default is the name of the observable being defined.
+ * @param values A list of strings providing the options
+ * @param [labels]
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param [width] Width in pixels
+ * @param [is_horizontal
+ * @param [enabled]] Boolean to determine if the radio buttons are enabled
+ */
+func RadioButtons { ${{
+	var argsProcessed;
+
+	var name;
+	if (typeof(arguments[0]) == "string") {
+		name = arguments[0];
+		argsProcessed = 1;
+	} else {
+		name = root.currentObservableName();
+		argsProcessed = 0;
+		if (name === undefined) {
+			eden.error(new Error("RadioButtons: Every group of radio buttons must have a name."), "error");
+			return undefined;
+		}
+	}
+
+	var values = arguments[argsProcessed];
+	argsProcessed++;
+	var labels;
+	if (Array.isArray(arguments[argsProcessed])) {
+		labels = arguments[argsProcessed];
+		argsProcessed++;
+	} else {
+		labels = values;
+	}
+	var x = arguments[argsProcessed];
+	argsProcessed++;
+	var y = arguments[argsProcessed];
+	argsProcessed++;
+	var width;
+	if (typeof(arguments[argsProcessed]) ==  "number" || arguments.length - argsProcessed > 2) {
+		width = arguments[argsProcessed];
+		argsProcessed++;
+	}
+	var horizontal = arguments[argsProcessed];
+	argsProcessed++;
+	var enabled = arguments[argsProcessed];
+
+	return new RadioButtons(name, values, labels, x, y, width, horizontal, enabled);
+}}$; }
+
+${{
+
+RadioButtons.prototype.makeHTML = function() {
+	var build = "";
+	var disabled = this.enabled === false? ' disabled="disabled"' : '';
+
+	for (var i = 0; i < this.values.length; i++) {
+		build = build + '<label><input type="radio" name="' + this.name +
+			'" value="' + this.values[i] + '"' + disabled + '/> ' +
+			this.labels[i] + '</label><br/>';
+	}
+
+	if (this.horizontal) {
+		return '<form class="canvashtml-item canvas-horizontal-radio-buttons">' + build + '</form>';
+	} else {
+		return '<form class="canvashtml-item">' + build + '</form>';
+	}
+};
+
+RadioButtons.prototype.draw = function (context) {
+
+	if(this.elements === undefined) {
+		var name = this.name;
+
+		//Make the HTML
+		var formJQ = $(this.makeHTML());
+
+		var formElement = formJQ.get(0);
+		var updateValue = function (buttonGroup, value) {
+			for (var i = 0; i < buttonGroup.length; i++) {
+				if (buttonGroup[i].value == value) {
+					buttonGroup[i].checked = true;
+					break;
+				} else {
+					//Possibility of having no radio button selected.
+					buttonGroup[i].checked = false;
+				}
+			}
+		
+		};
+		var valueSym = root.lookup(name + "_value");
+		var initialValue = valueSym.value();
+		if (initialValue !== undefined) {
+			updateValue(formElement.elements, initialValue);
+		}
+		valueSym.addJSObserver("updateUI", function (symbol, value) {
+			updateValue(formElement.elements, value);
+		});
+
+		formJQ.change(function(event) {
+			root.lookup(name + "_value").assign(event.target.value, root.scope, Symbol.hciAgent, true);
+		})
+		.on("mousedown", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseDownZone").assign(undefined, root.scope, Symbol.hciAgent, mouseFollow);
+		})
+		.on("mouseup", function () {
+			edenUI.plugins.Canvas2D.endClick();
+		})
+		.on("mouseenter", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseZone").assign(name, root.scope, Symbol.hciAgent, mouseFollow);
+		});
+
+		this.elements = [formElement];
+	}
+};
+
+RadioButtons.prototype.scale = function (scale, zoom, origin) {
+	var elem = this.elements[0];
+	var style = elem.style;
+	style.left = Math.round((this.x + origin.x) * scale) + "px";
+	style.top =  Math.round((this.y + origin.y) * scale) + "px";
+	if (this.width === undefined) {
+		style.width = "";
+	} else {
+		style.width = Math.round(this.width * scale) + "px";
+	}
+	style.fontSize = zoom + "em";
+	var buttonSize = Math.round(13 * zoom) + "px";
+	$(elem).find("input").css({width: buttonSize, height: buttonSize});
+};
+
+RadioButtons.prototype.toString = function() {
+	if (this.name == this.obsName) {
+		return "RadioButtons(" + Eden.edenCodeForValues(this.values, this.labels, this.x,
+			this.y, this.width, this.horizontal, this.enabled) + ")";
+	} else {
+		return "RadioButtons(" + Eden.edenCodeForValues(this.name, this.values, this.labels, this.x,
+			this.y, this.width, this.horizontal, this.enabled) + ")";
+	}
+};
+
+RadioButtons.prototype.getEdenCode = RadioButtons.prototype.toString;
+
+}}$;

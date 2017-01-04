@@ -1,0 +1,113 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+Rectangle = function(x, y, width, height, fillcolour, outlinecolour, drawingOptions) {
+	this.x = x;
+	this.y = y;
+	this.width = width;
+	this.height = height;
+	this.fillcolour = fillcolour;
+	this.outlinecolour = outlinecolour;
+	this.drawingOptions = drawingOptions;
+	this.name = edenUI.plugins.Canvas2D.initZoneFromDrawingOpts(drawingOptions, "Rectangle");
+	this.obsName = root.currentObservableName();
+}
+}}$;
+
+/**
+ * Creates a rectangle that can be displayed on a canvas
+ * @param x X-coordinate for top left
+ * @param y Y-coordinate for top left
+ * @param width
+ * @param height
+ * @param [fill_colour
+ * @param [outline_colour]] Colour of the rectangle outline in HTML form
+ * @param [drawing_options] List of drawing options
+ * 
+ * #canvas #rectangle #drawingoptions
+ */
+func Rectangle { ${{
+	var x = arguments[0];
+	var y = arguments[1];
+	var width = arguments[2];
+	var height = arguments[3];
+	var fillcolour, outlinecolour, drawingOptions;
+	var lastArg = arguments[arguments.length - 1];
+	var processUpTo;
+	if (lastArg !== undefined && (lastArg instanceof Object) && !(lastArg instanceof EdenUI.plugins.Canvas2D.FillStyle)) {
+		drawingOptions = lastArg;
+		processUpTo = arguments.length - 2;
+	} else {
+		processUpTo = arguments.length - 1;
+	}
+	if (processUpTo >= 4) {
+		fillcolour = arguments[4];
+		if (processUpTo == 5) {
+			outlinecolour = arguments[5];
+		}
+	}
+	if (fillcolour === undefined && outlinecolour === undefined) {
+		outlinecolour = "black";
+	}
+	return new Rectangle(x, y, width, height, fillcolour, outlinecolour, drawingOptions);
+}}$; };
+
+${{
+
+Rectangle.prototype.draw = function (context, scale) {
+	var lineWidth;
+	if (this.outlinecolour !== undefined) {
+		lineWidth = context.lineWidth;
+		if (this.drawingOptions !== undefined) {
+			if (!("join" in this.drawingOptions) && lineWidth < 10) {
+				//Bug in Chrome v44, shape isn't drawn when miter join is used with larger line widths.
+				context.lineJoin = "miter"
+			}
+		}
+	} else {
+		lineWidth = 0;
+	}
+	var y = this.y;
+	if (scale < 0) {
+		y = y - this.height;
+	}
+	if (this.fillcolour !== undefined) {
+		edenUI.plugins.Canvas2D.setFillStyle(context, this.fillcolour);
+		context.fillRect(this.x + lineWidth, y + lineWidth, this.width - 2 * lineWidth, this.height - 2 * lineWidth);
+	}
+	if (this.outlinecolour !== undefined) {
+		context.strokeStyle = this.outlinecolour;
+		context.strokeRect(this.x + lineWidth / 2, y + lineWidth / 2, this.width - lineWidth, this.height - lineWidth);
+	}
+};
+
+Rectangle.prototype.isHit = function (context, scale, x, y) {
+	return x >= this.x && x < this.x + this.width && y >= this.y && y < this.y + this.height;
+}
+
+Rectangle.prototype.toString = function() {
+	var s = "Rectangle(" + Eden.edenCodeForValues(this.x, this.y, this.width, this.height, this.fillcolour, this.outlinecolour);
+
+	if (this.drawingOptions !== undefined) {
+		s = s + ", " + Eden.edenCodeForValue(this.drawingOptions);
+	}
+	
+	s = s + ")";
+	return s;
+};
+
+Rectangle.prototype.getEdenCode = Rectangle.prototype.toString;
+
+Rectangle.prototype.imageMapArea = function () {
+	return "shape=\"rect\" coords=\"" + this.x + "," + this.y + "," + (this.x + this.width) + "," +
+		(this.y + this.height) + "\"";
+}
+
+Rectangle.prototype.centre = function () {
+	return new Point(this.x + this.width / 2, this.y + this.height / 2);
+}
+
+}}$;

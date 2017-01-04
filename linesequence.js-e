@@ -1,0 +1,124 @@
+## Copyright (c) 2015, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+LineSequence = function(vertices, colours, drawingOptions) {
+	this.vertices = vertices;
+	this.colours = colours;
+	this.drawingOptions = drawingOptions;
+
+	this.minX = this.vertices[0].x;
+	this.minY = this.vertices[0].y;
+	this.maxX = this.minX, this.maxY = this.minY;
+	for (var i = 1; i < this.vertices.length; i++) {
+		var vertex = this.vertices[i];
+		if (vertex.x < this.minX) {
+			this.minX = vertex.x;
+		} else if (vertex.x > this.maxX) {
+			this.maxX = vertex.x;
+		}
+		if (vertex.y < this.minY) {
+			this.minY = vertex.y;
+		} else if (vertex.y > this.maxY) {
+			this.maxY = vertex.y;
+		}
+	}
+}
+}}$;
+
+/**
+ * Creates a sequence of joined lines for display on the canvas from a list of Points
+ * 
+ * @param points List of coordinates in the form Point(x, y) from the top left corner of the canvas
+ * @param [colour(s)] Colour of the line as a HTML colour value, or a list of such colour values
+ * @param [drawing_options] List of drawingOptions
+ * 
+ * #canvas #line #linesequence #drawingoptions
+ */
+func LineSequence { ${{
+	var vertices = arguments[0];
+	var colours, drawingOptions;
+	var lastArg = arguments[arguments.length - 1];
+	var processUpTo;
+	if (lastArg !== undefined && (lastArg instanceof Object) && !Array.isArray(lastArg)) {
+		drawingOptions = lastArg;
+		processUpTo = arguments.length - 2;
+	} else {
+		processUpTo = arguments.length - 1;
+	}
+	if (processUpTo == 1) {
+		colours = arguments[1];
+	}
+
+	if (colours === undefined) {
+		colours = ["black"];
+	} else if (!Array.isArray(colours)) {
+		colours = [colours];
+	} else if (colours.length == 0) {
+		colours = ["black"];
+	}
+
+	return new LineSequence(vertices, colours, drawingOptions);
+}}$; };
+
+${{
+LineSequence.prototype.draw = function(context, scale) {
+	if (this.drawingOptions !== undefined && this.drawingOptions.lineWidth % 2 == 1) {
+		context.translate(0.5 / scale, 0.5 / scale);
+	}
+
+	context.beginPath();
+	var maxVertex = this.vertices.length - 1;
+	if (this.colours.length == 1) {
+		context.strokeStyle = this.colours[0];
+	} else {
+		var gradient = context.createLinearGradient(this.minX, this.minY, this.maxX, this.maxY);
+		for (var i = 0; i < this.colours.length; i++) {
+			gradient.addColorStop(i / (this.colours.length - 1), this.colours[i]);
+		}
+		context.strokeStyle = gradient;
+	}
+
+	context.moveTo(this.vertices[0].x, this.vertices[0].y);
+	for (var i = 1; i <= maxVertex; i++) {
+		context.lineTo(this.vertices[i].x, this.vertices[i].y);
+	}
+	
+	context.stroke();
+
+	if (this.drawingOptions !== undefined && this.drawingOptions.arrowhead instanceof Arrowhead) {
+		var vertex0 = this.vertices[0];
+		var vertex1 = this.vertices[1];
+		var vertexN = this.vertices[maxVertex];
+		var vertexNMinus1 = this.vertices[maxVertex - 1];
+		var gradient1 = (vertex1.y - vertex0.y) / (vertex1.x - vertex0.x);
+		var gradient2 = (vertexN.y - vertexNMinus1.y) / (vertexN.x - vertexNMinus1.x);
+		var reverse1 = vertex0.x > vertex1.x;
+		var reverse2 = vertexNMinus1.x > vertexN.x;
+		this.drawingOptions.arrowhead.draw(context, scale, vertex0.x, vertex0.y, gradient1, reverse1,
+			vertexN.x, vertexN.y, gradient2, reverse2);
+	}	
+};
+
+LineSequence.prototype.toString = function() {
+	var s = "LineSequence(" + Eden.edenCodeForValue(this.vertices) + ",";
+	
+	if (this.colours.length > 1) {
+		s = s + Eden.edenCodeForValue(this.colours);
+	} else {
+		s = s + Eden.edenCodeForValue(this.colours[0]);	
+	}
+
+	if (this.drawingOptions !== undefined) {
+		s = s + ", " + Eden.edenCodeForValue(this.drawingOptions);
+	}
+	
+	s = s + ")";
+	return s;
+};
+
+LineSequence.prototype.getEdenCode = LineSequence.prototype.toString;
+
+}}$;

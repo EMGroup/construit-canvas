@@ -1,0 +1,389 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+Slider = function(name, min, max, step, labelInterval, tickMarkInterval, labelDivisor, x, y, length, orientation, enabled) {
+	this.name = name;
+	this.obsName = root.currentObservableName();
+	this.min = min;
+	this.max = max;
+	this.step = step;
+	this.labelInterval = labelInterval;
+	this.tickMarkInterval = tickMarkInterval;
+	this.labelDivisor = labelDivisor;
+	this.x = x;
+	this.y = y;
+	this.length = length;
+	this.orientation = orientation;
+	this.enabled = enabled;
+}
+
+Slider.prototype.hash = function () {
+	return this.name+"$$"+
+				this.min+"$$"+
+				this.max+"$$"+
+				this.step+"$$"+
+				this.labelInterval+"$$"+
+				this.tickMarkInterval+"$$"+
+				this.labelDivisor+"$$"+
+				this.x+"$$"+
+				this.y+"$$"+
+				this.length+"$$"+
+				this.orientation+"$$"+
+				this.enabled;
+};
+}}$;
+
+/**
+ * Create a slider input control
+ * 
+ * @param [name] Prefix for _value and _preview observables.  Default is the name of the observable being defined.
+ * @param min Minimum value of the slider
+ * @param max Maximum value of the slider
+ * @param [step Step interval
+ * @param [label_interval How frequently to display labels
+ * @param [tick_mark_interval How frequently to display tick marks
+ * @param [label_divisor]]]] Each label is divided by label_divisor before display 
+ * @param x X-position
+ * @param y Y-position
+ * @param size Size in pixels
+ * @param [orientation] Either "horizontal", "vertical", "up", or "down"
+ * @param [enabled] Boolean True or False
+ *
+ * #canvas #input #slider
+ * 
+ */
+func Slider { ${{
+	var argsProcessed;
+
+	var name;
+	if (typeof(arguments[0]) == "string") {
+		name = arguments[0];
+		argsProcessed = 1;
+	} else {
+		name = root.currentObservableName();
+		argsProcessed = 0;
+		if (name === undefined) {
+			eden.error(new Error("Slider: Every slider must have a name."), "error");
+			return undefined;
+		}
+	}
+	var min = arguments[argsProcessed];
+	argsProcessed++;
+	var max = arguments[argsProcessed];
+	argsProcessed++;
+
+	var step, labelInterval, labelDivisor, tickMarkInterval, x, y, length, orientation, enabled;
+	var arg, argType;
+	if (typeof(arguments[argsProcessed + 6]) == "number") {
+		step = arguments[argsProcessed];
+		labelInterval = arguments[argsProcessed + 1];
+		tickMarkInterval = arguments[argsProcessed + 2];
+		labelDivisor = arguments[argsProcessed + 3];
+		argsProcessed = argsProcessed + 4;
+	} else if (typeof(arguments[argsProcessed + 5]) == "number") {
+		step = arguments[argsProcessed];
+		labelInterval = arguments[argsProcessed + 1];
+		tickMarkInterval = arguments[argsProcessed + 2];
+		argsProcessed = argsProcessed + 3;
+	} else if (typeof(arguments[argsProcessed + 4]) == "number") {
+		step = arguments[argsProcessed];
+		labelInterval = arguments[argsProcessed + 1];
+		argsProcessed = argsProcessed + 2;
+	} else if (typeof(arguments[argsProcessed + 3]) == "number") {
+		step = arguments[argsProcessed];
+		argsProcessed++;
+	} else if (max - min > 1 && Math.floor(min) == min && Math.floor(max) == max) {
+		step = 1;
+	}
+	x = arguments[argsProcessed];
+	y = arguments[argsProcessed + 1];
+	length = arguments[argsProcessed + 2];
+	argsProcessed = argsProcessed + 3;
+	arg = arguments[argsProcessed];
+	argType = typeof(arg);
+	if (arg === undefined || argType == "string") {
+		orientation = arguments[argsProcessed];
+		argsProcessed++;
+		arg = arguments[argsProcessed];
+	}
+	enabled = arg;
+
+	if (labelInterval !== undefined) {
+		if (labelDivisor === undefined) {
+			labelDivisor = 1;
+		}
+		if (tickMarkInterval === undefined) {
+			tickMarkInterval = labelInterval;
+		}
+	}
+	if (orientation === undefined) {
+		orientation = "horizontal";
+	}
+	if (enabled === undefined) {
+		enabled = true;
+	}
+
+	return new Slider(name, min, max, step, labelInterval, tickMarkInterval, labelDivisor, x, y, length, orientation, enabled);
+}}$; }
+
+${{
+
+Slider.prototype.draw = function (context) {
+
+	if (this.elements === undefined) {
+		var name = this.name;
+		var me = this;
+		var agent = root.lookup("Slider");
+
+		var cssClass;
+		if (this.orientation == "down"){
+			cssClass = "slider-down"
+		} else if (this.orientation == "up" || this.orientation == "vertical") {
+			cssClass = "slider-up"
+		} else {
+			cssClass = "slider-horizontal";
+		}
+		var disabled = this.enabled === false? "disabled=\"disabled\"" : "";
+		var inputHTML = '<input ' +
+			disabled +
+			'type="range" ' +
+			'min="' + this.min + '" ' +
+			'max="' + this.max + '" ';
+		if (this.step === undefined) {
+			inputHTML = inputHTML + 'step="0.0000001"';		
+		} else {
+			inputHTML = inputHTML + 'step="' + this.step + '"';
+		}
+		inputHTML = inputHTML + '/>';
+		var inputJQ = $(inputHTML);
+		var inputElem = inputJQ.get(0);
+		this.sliderElement = inputElem;
+
+		var valueSym = root.lookup(name + "_value");
+		var previewSym = root.lookup(name + "_preview");
+
+		function setValue(obs, value, force) {
+			if (typeof(value) != "number") {
+				return;
+			}
+			var previewSym = root.lookup(name + "_preview");
+			var previewValue = previewSym.value();
+			if (previewValue !== value || force) {
+				var roundedValue;
+				if (value >= me.min && value <= me.max) {
+					inputElem.value = value;
+					roundedValue = parseFloat(inputElem.value);
+					if (roundedValue != value) {
+						//Value didn't match the step size.
+						obs.assign(roundedValue, root.scope, agent);
+					}
+				} else {
+					if (value < me.min) {
+						inputElem.value = me.min;
+					} else {
+						inputElem.value = me.max;
+					}
+					if (me.step !== undefined) {
+						roundedValue = Math.round(((value - me.min) / me.step).toPrecision(16)) * me.step + me.min;
+						if (roundedValue != value) {
+							obs.assign(roundedValue, root.scope, agent);
+						}
+					} else {
+						roundedValue = value;
+					}
+				}
+				if (previewValue != roundedValue) {
+					previewSym.assign(roundedValue, root.scope, Symbol.hciAgent);
+				}
+			}
+		}
+
+		valueSym.addJSObserver("updateUI", setValue);
+		previewSym.addJSObserver("updateUI", function (obs, preview) {
+			if (typeof(preview) != "number") {
+				return;
+			}
+			var previewSym = root.lookup(name + "_preview");
+			var valueSym = root.lookup(name + "_value");
+			if (previewSym.last_modified_by !== Symbol.hciAgent.name) {
+				var roundedValue;
+				if (preview >= me.min && preview <= me.max) {
+					inputElem.value = preview;
+					roundedValue = parseFloat(inputElem.value);
+					if (roundedValue != preview) {
+						//Value didn't match the step size.
+						obs.assign(roundedValue, root.scope, agent);
+					}
+				} else {
+					if (preview < me.min) {
+						inputElem.value = me.min;
+					} else {
+						inputElem.value = me.max;
+					}
+					if (me.step !== undefined) {
+						roundedValue = Math.round(((preview - me.min) / me.step).toPrecision(16)) * me.step + me.min;
+						if (roundedValue != value) {
+							obs.assign(roundedValue, root.scope, agent);
+						}
+					} else {
+						roundedValue = preview;
+					}
+				}
+				valueSym.assign(roundedValue, root.scope, agent);
+			}
+		});
+
+		inputJQ
+		.on("input", function(){
+			root.lookup(name + "_preview").assign(parseFloat(this.value), root.scope, Symbol.hciAgent, true);
+		})
+		.on("mousedown", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseDownZone").assign(undefined, root.scope, Symbol.hciAgent, mouseFollow);
+		})
+		.on("mouseup", function () {
+			root.lookup(name + "_value").assign(parseFloat(this.value), root.scope, Symbol.hciAgent, true);
+			edenUI.plugins.Canvas2D.endClick();
+		})
+		.on("keyup", function () {
+			root.lookup(name + "_value").assign(parseFloat(this.value), root.scope, Symbol.hciAgent, true);		
+		})
+		.on("mouseenter", function () {
+			var mouseFollow = root.lookup("mouseFollow").value();
+			root.lookup("mouseZone").assign(name, root.scope, Symbol.hciAgent, mouseFollow);
+		});
+
+		var outerDiv = $('<div class="' + cssClass + '" ></div>');
+		if ((this.tickMarkInterval > 0 || this.labelInterval > 0) && this.max > this.min) {
+			var innerDiv = $('<div style="position: relative; height: 100%"></div>');
+			outerDiv.append(innerDiv);
+			if (this.tickMarkInterval > 0) {
+				for (var i = this.min; i <= this.max; i = i + this.tickMarkInterval) {
+					var percentage = (i - this.min) / (this.max - this.min) * 100;
+					//The offset is to get the centre of the slider thumb positioned exactly on the tick mark.
+					var offset = Math.round((50 - percentage) / 100 * 10);
+					var position = 'calc(' + percentage + '% + ' + offset + 'px)';
+					var tickMark = $('<div"></div>');
+					if (this.orientation == "horizontal") {
+						tickMark.css("left", position);
+					} else {
+						tickMark.css("top", position);
+					}
+					if ((i - this.min) % this.labelInterval == 0) {
+						tickMark.addClass("slider-major-tick-mark");
+					} else {
+						tickMark.addClass("slider-minor-tick-mark");
+					}
+					innerDiv.append(tickMark);
+				}
+			}
+			inputJQ.css("width", "100%");
+			innerDiv.append(inputJQ);
+			if (this.labelInterval > 0) {
+				if (this.orientation == "horizontal") {
+					var labelWidth = 100 / ((this.max - this.min) / this.labelInterval);
+					var halfLabelWidth = labelWidth / 2;
+					for (var i = this.min; i <= this.max; i = i + this.labelInterval) {
+						var percentage = (i - this.min) / (this.max - this.min) * 100 - halfLabelWidth;
+						var offset = Math.round((50 - percentage) / 100 * 10);
+						var labelText = i / this.labelDivisor;
+						var label = $(
+							'<div ' + 
+								'class="slider-label" ' +
+								'style="left: calc(' + percentage + '% + ' + offset + 'px); width: ' + labelWidth + '%"' +
+							'>' +
+								labelText +
+							'</div>'
+						);
+						innerDiv.append(label);
+					}
+				} else {
+					for (var i = this.max; i >= this.min; i = i - this.labelInterval) {
+						var percentage = (this.max - i) / (this.max - this.min) * 100;
+						var offset = Math.round((50 - percentage) / 100 * 10 + 1);
+						var labelText;
+						if (this.orientation == "down") {
+							labelText = (this.max - i) / this.labelDivisor;
+						} else {
+							labelText = i / this.labelDivisor;
+						}
+						var label = $(
+							'<div ' +
+								'class="slider-label" ' +
+								'style="top: calc(' + percentage + '% + ' + offset + 'px - 0.5em)"' +
+							'>' +
+								labelText +
+							'</div>'
+						);
+						innerDiv.append(label);
+					}
+				}
+			}
+		} else {
+			outerDiv.append(inputJQ);
+		}
+		this.elements = [outerDiv.get(0)];
+
+		//Initialization
+		var value = valueSym.value();
+		var previewValue = previewSym.value();
+		if (value === undefined) {
+			if (previewValue === undefined) {
+				var defaultValue = (this.max - this.min) / 2 + this.min;
+				valueSym.assign(defaultValue, root.scope, agent);
+				setValue(valueSym, defaultValue, true);
+			} else {
+				valueSym.assign(previewValue, root.scope, agent);
+				setValue(valueSym, previewValue, true);
+			}
+		} else {
+			setValue(valueSym, value, true);
+		}
+	}
+};
+
+Slider.prototype.scale = function (scale, zoom, origin) {
+	if (!this.sliderElement) {
+		return;
+	}
+	var slider = this.sliderElement;
+	var sliderStyle = slider.style;
+	var divStyle = this.elements[0].style;
+	var width = Math.round(this.length * scale);
+	var isVertical = this.orientation == "up" || this.orientation == "down" || this.orientation == "vertical";
+	if (isVertical) {
+		sliderStyle.left = Math.round(-this.length / 2 * scale) + "px";
+		sliderStyle.top = Math.round((this.length / 2 - 10) * scale) + "px";
+		sliderStyle.width = width + "px";
+		divStyle.height = width + "px";
+	} else {
+		divStyle.width = width + "px";	
+	}
+
+	divStyle.fontSize = zoom + "em";
+	divStyle.left = Math.round((this.x + origin.x) * scale) + "px";
+	divStyle.top =  Math.round((this.y + origin.y) * scale) + "px";
+
+	if (this.step == undefined) {
+		slider.step = String((slider.max - slider.min) / (width  - 1)).slice(0, 16);
+	}
+};
+
+Slider.prototype.toString = function() {
+	if (this.name == this.obsName) {
+		return "Slider(" + Eden.edenCodeForValues(this.min, this.max, this.step, this.labelInterval,
+			this.tickMarkInterval, this.labelDivisor, this.x, this.y, this.length, this.orientation,
+			this.enabled) + ")";
+	} else {
+		return "Slider(" + Eden.edenCodeForValues(this.name, this.min, this.max, this.step,
+			this.labelInterval, this.tickMarkInterval, this.labelDivisor, this.x, this.y,
+			this.length, this.orientation, this.enabled) + ")";
+	}
+};
+
+Slider.prototype.getEdenCode = Slider.prototype.toString;
+
+}}$;

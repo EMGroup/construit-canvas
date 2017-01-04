@@ -1,0 +1,453 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+Text = function(text, x, y, size, fillcolour, outlinecolour, options, valign, align) {
+	this.text = text;
+	this.x = x;
+	this.y = y;
+	this.size = size;
+	this.fillcolour = fillcolour;
+	this.outlinecolour = outlinecolour;
+
+	var optionsType = typeof(options);
+	var css;
+
+	if (optionsType == "object") {
+
+		this.drawingOptions = options;
+
+		if (options.italic) {
+			css = "italic ";
+		} else {
+			css = "";
+		}
+		if (options.smallCaps) {
+			css = css + "small-caps ";
+		}
+		if (options.bold) {
+			css = css + "bold ";
+		}
+		if (size !== undefined) {
+			css = css + size + "px ";
+		} else {
+			css = css + edenUI.plugins.Canvas2D.defaultFontSizePx + "px ";
+		}
+		if (options.fontFace === undefined) {
+			css = css + "sans-serif";
+		} else {
+			css = css + options.fontFace + ", sans-serif";
+		}
+
+	} else if (optionsType == "string") {
+
+		this.drawingOptions = {align: align, valign: valign};
+		css = options;
+
+	} else {
+
+		this.drawingOptions = {align: "top"};
+		if (size !== undefined) {
+			css = size + "px sans-serif";
+		} else {
+			css = edenUI.plugins.Canvas2D.defaultFontSizePx + "px sans-serif";
+		}
+
+	}
+
+	if (this.drawingOptions.align == "centre") {
+		this.drawingOptions.align = "center";
+	}
+	if (this.drawingOptions.valign == "baseline") {
+		this.drawingOptions.valign = "alphabetic";
+	}
+
+	this.css = css;
+	this.optionsType = optionsType;
+	this.name = edenUI.plugins.Canvas2D.initZoneFromDrawingOpts(options, "Text");
+	this.obsName = root.currentObservableName();
+}
+
+// RegExp groups: (valign) (align) (style) (size) (font)
+Text.cssRegExp = new RegExp(
+		"^\\s*(" +
+		"?:(top|middle|baseline|alphabetic|ideographic|bottom)?\\s*" + 
+		"(\\b(?:left|right|center|centre))?\\s*" +
+		"((?:\\bitalic)?\\s*" +
+		"(?:\\bsmall-caps)?\\s*" +
+		"(?:\\bbold)?)\\s*" +
+		"(\\b(?:smaller|larger|(?:\\d+(?:\\.\\d+)?[a-zA-Z%]+)))?\\s*" +
+		"(\\b(?:.+,)?\\s*(?:(?:sans-)?serif|monospace|cursive|fantasy))?" +
+		")\\s*$"
+);
+
+}}$;
+
+/**
+ * Create a drawable text object for a canvas
+ * 
+ * @param text Text string to display
+ * @param x X-coordinate
+ * @param y Y-coordinate
+ * @param [size] Size in pixels, or can be specified as a string with a unit (e.g., "30pt", "2em", etc.)
+ * @param [fill_colour Text colour in HTML form
+ * @param [outline_colour]]
+ * @param [options] Options, in string or object format
+ * 
+ * #canvas #text
+ */
+func Text {
+	${{
+		var text = arguments[0];
+		var x = arguments[1];
+		var y = arguments[2];
+		var size, fillcolour, outlinecolour, options, valign, align;
+
+		var numArgs = arguments.length;
+		var argsLeft = numArgs - 3;
+		var argsProcessed = 3;
+
+		if (arguments[3] === undefined || typeof(arguments[3]) == "number") {
+			size = arguments[3];
+			argsProcessed++;
+			argsLeft--;
+		}
+
+		var lastArg = arguments[numArgs - 1];
+		var argType = typeof(lastArg);
+		var match;
+
+		if (argType == "string") {
+			match = lastArg.match(Text.cssRegExp);
+		}
+
+		if (match) {
+			argsLeft--;
+			valign = match[1];
+			align = match[2];
+			if (match[3]) {
+				// italic, bold, etc.
+				options = match[3];
+			} else {
+				options = "";
+			}
+			if (match[4]) {
+				// size
+				options = options + " " + match[4];
+			} else if (size !== undefined) {
+				options = options + " " + size + "px";
+			} else {
+				options = options + " " + edenUI.plugins.Canvas2D.defaultFontSizePx + "px";
+			}
+			if (match[5]) {
+				// font family
+				options = options + " " + match[5];
+			} else {
+				options = options + " sans-serif";
+			}
+
+		} else if (argType == "object" && !(lastArg instanceof EdenUI.plugins.Canvas2D.FillStyle)) {
+			argsLeft--;
+			options = lastArg;
+		}
+
+		if (argsLeft > 0) {
+			fillcolour = arguments[argsProcessed];
+			argsLeft--;
+			argsProcessed++;
+			if (argsLeft > 0) {
+				outlinecolour = arguments[argsProcessed];
+			}
+		}
+
+		if (outlinecolour === undefined && fillcolour === undefined) {
+			fillcolour = "black";
+		}
+		return new Text(text, x, y, size, fillcolour, outlinecolour, options, valign, align);
+	}}$;
+}
+
+${{
+
+Text.prototype.draw = function (context, scale) {
+
+	if (scale != 1) {
+		var inverseScale = 1 / scale;
+		if (scale >= 0) {
+			context.scale(inverseScale, inverseScale);
+		} else {
+			context.scale(-inverseScale, inverseScale);
+		}
+	}
+	context.font = this.css;
+	if (this.drawingOptions.valign) {
+		context.textBaseline = this.drawingOptions.valign;
+	} else {
+		context.textBaseline = "top";
+	}
+
+	var lineWidth;
+	if (this.outlinecolour !== undefined) {
+		lineWidth = context.lineWidth;
+	} else {
+		lineWidth = 0;
+	}
+
+	var x = (this.x + lineWidth / 2) * scale + 1;
+	var y = this.y * scale + 1;
+
+	var align = this.drawingOptions.align;
+	if (align) {
+		context.textAlign = align;
+		if (align == "center") {
+			x--;
+		}
+	}
+
+	if (this.fillcolour !== undefined) {
+		edenUI.plugins.Canvas2D.setFillStyle(context, this.fillcolour);
+		context.fillText(this.text, x, y);
+	}
+	if (this.outlinecolour !== undefined) {
+		context.lineWidth = lineWidth * scale;
+		context.strokeStyle = this.outlinecolour;
+		context.strokeText(this.text, x, y);	
+	}
+};
+
+Text.prototype.isHit = function (context, scale, px, py) {
+	var x = this.x + 1 / scale;
+	var y = this.y + 1 / scale;
+	var width, height;
+	
+	if (this.width === undefined) {
+		var div = document.createElement("div");
+		div.innerHTML = this.text;
+		div.style.position = 'absolute';
+		div.style.top  = '-9999px';
+		div.style.font = this.css;
+		document.body.appendChild(div);
+		this.width = div.offsetWidth;
+		this.height = div.offsetHeight;
+		document.body.removeChild(div);
+	}
+
+	var lineWidth;
+	if (this.outlinecolour !== undefined) {
+		lineWidth = context.lineWidth;
+	} else {
+		lineWidth = 0;
+	}
+	width = this.width / scale + lineWidth;
+	height = this.height / scale + lineWidth / 2;
+
+	return px >= x && px < x + width && py >= y && py < y + height;
+}
+
+Text.prototype.toString = function() {
+	var s = "Text(" + Eden.edenCodeForValues(this.text, this.x, this.y, this.size, this.fillcolour,
+		this.outlinecolour);
+	var optionsType = this.optionsType;
+
+	if (optionsType == "string") {
+		s = s + ", \"";
+		if (this.drawingOptions.valign) {
+			s = s + this.drawingOptions.valign + " ";
+		}
+		if (this.drawingOptions.align) {
+			s = s + this.drawingOptions.align + " ";
+		}
+		s = s + this.css + "\")";
+	} else if (optionsType == "object") {
+		s = s + ", " + Eden.edenCodeForValue(this.drawingOptions) + ")";
+	}
+	return s;
+};
+
+Text.prototype.getEdenCode = Text.prototype.toString;
+
+Text.parseArgs = function () {
+	var text = arguments[0];
+	var size;
+	var css, optionsObj, scale;
+
+	var argsProcessed = 1;
+	var arg = arguments[1];
+	var argType = typeof(arg);
+
+	if (arg === undefined || argType == "number") {
+		size = arg;
+		argsProcessed++;
+		arg = arguments[argsProcessed];
+		argType = typeof(arg);
+	}
+
+	if (argType == "string") {
+
+		var match = arg.match(Text.cssRegExp);
+		if (match) {
+			if (match[3]) {
+				// italic, bold, etc.
+				css = match[3];
+			} else {
+				css = "";
+			}
+			if (match[4]) {
+				// size
+				css = css + " " + match[4];
+			} else if (size !== undefined) {
+				css = css + " " + size + "px";
+			} else {
+				css = css + " 1em";
+			}
+			if (match[5]) {
+				// font family
+				css = css + " " + match[5];
+			} else {
+				css = css + " sans-serif";
+			}
+		} else {
+			css = arg;
+		}
+
+		argsProcessed++;
+		arg = arguments[argsProcessed];
+
+	} else if (argType == "object") {
+
+		optionsObj = arg;
+		if (arg.italic) {
+			css = "italic ";
+		} else {
+			css = "";
+		}
+		if (arg.smallCaps) {
+			css = css + "small-caps ";
+		}
+		if (arg.bold) {
+			css = css + "bold ";
+		}
+		if (size) {
+			css = css + size + "px ";
+		} else {
+			css = css + "1em ";
+		}
+		if (arg.fontFace === undefined) {
+			css = css + "sans-serif";
+		} else {
+			css = css + arg.fontFace + ", sans-serif";
+		}
+
+		argsProcessed++;
+		arg = arguments[argsProcessed];
+
+	} else if (arg === undefined) {
+
+		if (size !== undefined) {
+			css = size + "px sans-serif";
+		} else {
+			css = edenUI.plugins.Canvas2D.defaultFontSizePx + "px sans-serif";
+		}
+
+		argsProcessed++;
+		arg = arguments[argsProcessed];
+
+	}
+
+	scale = arg;
+	if (scale === undefined) {
+		scale = 1;
+	}
+
+	return [css, optionsObj, scale];
+};
+
+}}$;
+
+func textWidth {
+	${{
+		var text = arguments[0];
+		var options = Text.parseArgs.apply(undefined, arguments);
+		var css = options[0];
+		var optionsObj = options[1];
+		var scale = options[2];
+
+		//Find an existing canvas (any one).
+		var canvas;
+		for (var canvasName in canvases) {
+			canvas =  canvases[canvasName];
+			break;
+		}
+		if (canvas === undefined) {
+			canvas = document.createElement("canvas");
+		}
+
+		var context = canvas.getContext("2d");
+		context.save();
+		edenUI.plugins.Canvas2D.configureContextDefaults(context, 1);
+		edenUI.plugins.Canvas2D.configureContext(context, 1, 1, optionsObj);
+		context.font = css;
+		context.textBaseline = "top";
+		var metrics = context.measureText(text);
+		var lineWidth;
+		if (this.outlinecolour !== undefined) {
+			lineWidth = context.lineWidth;
+		} else {
+			lineWidth = 0;
+		}
+		var width = Math.ceil(metrics.width + lineWidth) / scale;
+		context.restore();
+		return width;
+	}}$;
+}
+
+func textHeight {
+	${{
+		var text = arguments[0];
+		var options = Text.parseArgs.apply(undefined, arguments);
+		var fontCSS = options[0];
+		var optionsObj = options[1];
+		var scale = options[2];
+
+		var lineWidth;
+		if (optionsObj !== undefined) {
+			lineWidth = optionsObj.lineWidth;
+		}
+		if (lineWidth === undefined) {
+			lineWidth = 2;
+		}
+
+		var div = document.createElement("div");
+		div.innerHTML = text;
+		var style = div.style;
+		style.position = 'absolute';
+		style.top  = '-9999px';
+		style.padding = "0pt";
+		style.whiteSpace = "nowrap";
+		style.lineHeight = "1";
+		style.font = fontCSS;
+
+		//Find an existing canvas (any one).
+		var canvas, parent;
+		for (var canvasName in canvases) {
+			canvas =  canvases[canvasName];
+			break;
+		}
+		if (canvas) {
+			parent = canvas.parentNode;
+		}
+		if (!parent) {
+			parent = document.body;
+		}
+
+		parent.appendChild(div);
+		var height = div.scrollHeight;
+		parent.removeChild(div);
+		/* N.B. even when the vertical alignment is "top" Chrome still leaves a small top margin
+		 * where as Firefox doesn't.
+		 */
+		return (height + lineWidth / 2) / scale;
+	}}$;
+}

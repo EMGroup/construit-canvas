@@ -1,0 +1,152 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+Arc = function(x, y, r, sAngle, eAngle, colour, drawingOptions) {
+	this.x = x;
+	this.y = y;
+	this.r = r;
+	this.sAngle = sAngle;
+	this.eAngle = eAngle;
+	var radiansPerUnit = Math.PI / root.lookup("semicircleAngle").value();
+	var sRadians = sAngle * radiansPerUnit;
+	var eRadians = eAngle * radiansPerUnit;
+	var twoPI = 2 * Math.PI;
+	sRadians = sRadians % twoPI;
+	if (sRadians < 0) {
+		sRadians = sRadians + twoPI;
+	}
+	eRadians = eRadians % twoPI;
+	if (eRadians < 0) {
+		eRadians = eRadians + twoPI;
+	}
+	this.sRadians = sRadians;
+	this.eRadians = eRadians;
+	
+	this.colour = colour
+	this.drawingOptions = drawingOptions;
+}
+}}$;
+
+/**
+* Draw an Arc 
+* @param x x position
+* @param y y position
+* @param r radius
+* @param sAngle start angle in degrees
+* @param eAngle end angle in degrees
+* @param colour
+* @param drawingOptions Drawing Options object
+* #canvas #arc #drawingOptions
+*/
+
+
+func Arc { ${{
+	var x = arguments[0];
+	var y = arguments[1];
+	var r = arguments[2];
+	var sAngle = arguments[3];
+	var eAngle = arguments[4];
+	var colour, drawingOptions;
+	if (arguments.length == 6 && typeof(arguments[5]) == "object" && !(arguments[5] instanceof EdenUI.plugins.Canvas2D.FillStyle)) {
+		colour = "black";
+		drawingOptions = arguments[5];
+	} else {
+		colour = arguments[5];
+		drawingOptions = arguments[6];
+		if (colour === undefined) { colour = "black"; }
+	}
+	return new Arc(x, y, r, sAngle, eAngle, colour, drawingOptions);
+}}$; };
+semicircleAngle ~> [Arc];
+
+${{
+
+Arc.prototype.draw = function(context, scale) {
+	var anticlockwise;
+	if (this.drawingOptions !== undefined && "direction" in this.drawingOptions) {
+		var directionName = this.drawingOptions.direction;
+		var turnedThroughAC = this.eRadians - this.sRadians;
+		if (this.eRadians < this.sRadians) {
+			turnedThroughAC = turnedThroughAC + 2 * Math.PI;
+		}
+		switch (directionName) {
+		case "anticlockwise":
+		case "acw":
+		case "ccw":
+			anticlockwise = true;
+			break;
+		case "auto":
+			anticlockwise = this.sAngle < this.eAngle;
+			break;
+		case "clockwise":
+		case "cw":
+			anticlockwise = false;
+			break;
+		case "major":
+			anticlockwise = turnedThroughAC > Math.PI;
+			break;
+		case "minor":
+			anticlockwise = turnedThroughAC <= Math.PI;
+			break;
+		default:
+			//Invalid value specified.
+			anticlockwise = true;
+		}
+	} else {
+		//Default to "auto" 
+		anticlockwise = this.sAngle < this.eAngle;
+	}
+	var sRadians = this.sRadians;
+	var eRadians = this.eRadians;
+	if (scale < 0) {
+		sRadians = -sRadians;
+		eRadians = -eRadians;
+		anticlockwise = !anticlockwise;
+	}
+	var r = this.r - context.lineWidth / 2;
+	context.beginPath();
+	context.arc(this.x, this.y, r, -sRadians, -eRadians, anticlockwise);
+	context.strokeStyle = this.colour;
+	context.stroke();
+
+	if (this.drawingOptions !== undefined && this.drawingOptions.arrowhead instanceof Arrowhead) {
+		var cos1 = Math.cos(-sRadians);
+		var sin1 = Math.sin(-sRadians);
+		var cos2 = Math.cos(-eRadians);
+		var sin2 = Math.sin(-eRadians);
+		var x1 = this.x + r * cos1;
+		var y1 = this.y + r * sin1;
+		var x2 = this.x + r * cos2;
+		var y2 = this.y + r * sin2;
+		var gradient1 = -cos1 / sin1;
+		var gradient2 = -cos2 / sin2;
+		var reverse1, reverse2;
+		if (anticlockwise) {
+			reverse1 = sRadians <= Math.PI;
+			reverse2 = eRadians <= Math.PI;
+		} else {
+			reverse1 = sRadians > Math.PI;
+			reverse2 = eRadians > Math.PI;
+		}
+		this.drawingOptions.arrowhead.draw(context, scale, x1, y1, gradient1, reverse1, x2, y2,
+			gradient2, reverse2);
+	}
+};
+
+Arc.prototype.toString = function() {
+	var s = "Arc(" + Eden.edenCodeForValues(this.x, this.y, this.r, this.sAngle, this.eAngle, this.colour);
+
+	if (this.drawingOptions !== undefined) {
+		s = s + ", " + Eden.edenCodeForValue(this.drawingOptions);
+	}
+	
+	s = s + ")";
+	return s;
+}
+
+Arc.prototype.getEdenCode = Arc.prototype.toString;
+
+}}$;

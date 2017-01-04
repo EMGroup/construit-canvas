@@ -1,0 +1,42 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+${{
+Pixel = function(x, y, colour) {
+  this.x = x;
+  this.y = y;
+  this.colour = colour;
+}
+}}$;
+
+/*
+ * Creates a pixel that can be displayed on a canvas
+ * 
+ * @param x x-position
+ * @param y y-position
+ * @param colour colour
+ * 
+ */
+func Pixel { ${{
+  var x = arguments[0];
+  var y = arguments[1];
+  var colour = arguments[2];
+  return new Pixel(x, y, colour);
+}}$; };
+
+${{
+Pixel.prototype.toString = function() {
+  return "Pixel("+ Eden.edenCodeForValues(this.x, this.y, this.colour) + ")";
+};
+
+Pixel.prototype.getEdenCode = Pixel.prototype.toString;
+}}$;
+
+${{
+Pixel.prototype.draw = function(context) {
+  context.fillStyle = this.colour;
+  context.fillRect( this.x, this.y, 1, 1);
+};
+}}$;

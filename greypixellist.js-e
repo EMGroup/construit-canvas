@@ -1,0 +1,173 @@
+## Copyright (c) 2015, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+/** Returns a GreyPixelList drawable.  The ptrToData argument should be a pointer to a list of
+ * integers.  The first element represents the grey shade of the top-left pixel (0-255) and the
+ * subsequent elements represent successive pixels, first along the top row going from left to right
+ * and then along the second row, etc.  The data list should contain data for an exact number of rows
+ * of the specified width.  The image can be tinted in a particular colour using the optional
+ * redMultiply, greenMultiply, blueMultiply, redAdd, greenAdd and blueAdd parameters.
+ * redOfResultingPixel = redMultiply * grayscaleValue + redAdd
+ * greenOfResultingPixel = greenMultiply * grayscaleValue + redAdd
+ * blueOfResultingPixel = blueMultiply * grayscaleValue + blueAdd
+ *
+ * The resulting red, green and blue values from the above calculations are clipped so that the final
+ * values rendered all lie within the range 0 to 255.  This can be used to create effects, for
+ * example, multipliers greater than 1 increase the contrast of the image.  Usage of the undefined
+ * value in the list of grayscale values causes the relevant pixel to be white and uneffected by the
+ * tinting process.
+ *
+ * The multipliers all default to 1 and the additions all default to adding nothing, i.e. a pure
+ * grayscale image is created without a tint.
+ * 
+ * Example:
+ * ````
+ * func greyMap {
+ *		auto data, i, j, v;
+ *		data = [];
+ *		for (j = 0; j <= 255; j++) {
+ *			for (i = 0; i <= 255; i++) {
+ *					v = sqrt((i - 128) * (i - 128) + (j - 128) * (j - 128));
+ *					if (v > 115) {
+ *						append data, @;
+ *					} else {
+ *						append data, ((i - 128) * (i - 128) + (j - 128) * (j - 128)) % 256;
+ *					}
+ *			}
+ *		}
+		return data;
+ *	}
+ *	pixelData is greyMap();
+ *	pixels is GreyPixelList(&pixelData, mousePosition.x - 128, mousePosition.y - 128, 256);
+ *	picture is [pixels];
+ *  ````
+ *  @param [name]
+ *  @param ptrToData Pointer to the pixel data
+ *  @param x x-position
+ *  @param y y-position
+ *  @param width
+ *  @param [redMultiply]
+ *  @param [blueMultiply]
+ *  @param [greenMultiply]
+ *  @param [redAdd]
+ *  @param [blueAdd]
+ *  @param [greenAdd]
+ *  @return GreyPixelList drawable
+ */
+
+func GreyPixelList {
+	${{
+		var name;
+		var argsProcessed;
+		if (typeof(arguments[0]) == "string") {
+			name = arguments[0];
+			argsProcessed = 1;
+		} else {
+			argsProcessed = 0;
+		}
+		var ptrToData = arguments[argsProcessed];
+		argsProcessed++;
+		var x = arguments[argsProcessed];
+		argsProcessed++;
+		var y = arguments[argsProcessed];
+		argsProcessed++;
+		var width = arguments[argsProcessed];
+		argsProcessed++;
+		var redMultiply = arguments[argsProcessed];
+		if (redMultiply === undefined) redMultiply = 1;
+		argsProcessed++;
+		var greenMultiply = arguments[argsProcessed];
+		if (greenMultiply === undefined) greenMultiply = 1;
+		argsProcessed++;
+		var blueMultiply = arguments[argsProcessed];
+		if (blueMultiply === undefined) blueMultiply = 1;
+		argsProcessed++;
+		var redAdd = arguments[argsProcessed];
+		if (redAdd === undefined) redAdd = 0;
+		argsProcessed++;
+		var greenAdd = arguments[argsProcessed];
+		if (greenAdd === undefined) greenAdd = 0;
+		argsProcessed++;
+		var blueAdd = arguments[argsProcessed];
+		if (blueAdd === undefined) blueAdd = 0;
+		argsProcessed++;
+		return new GreyPixelList(name, ptrToData, x, y, width, redMultiply, greenMultiply, blueMultiply, redAdd, greenAdd, blueAdd);
+	}}$;
+}
+
+${{
+GreyPixelList = function(name, ptrToData, x, y, width, redMultiply, greenMultiply, blueMultiply, redAdd, greenAdd, blueAdd) {
+	this.name = edenUI.plugins.Canvas2D.initZoneFromName(name, "GreyPixelList");
+	this.obsName = root.currentObservableName();
+	this.ptr = ptrToData;
+	this.data = ptrToData instanceof Symbol? ptrToData.value() : [];
+	this.x = x;
+	this.y = y;
+	this.width = width;
+	this.height = this.data.length / width;
+	this.redMultiply = redMultiply;
+	this.greenMultiply = greenMultiply;
+	this.blueMultiply = blueMultiply;
+	this.redAdd = redAdd;
+	this.greenAdd = greenAdd;
+	this.blueAdd = blueAdd;
+}
+
+GreyPixelList.prototype.draw = function(context) {
+	var imageData = context.createImageData(this.width, this.height);
+	var imageArr = imageData.data;
+	var dataArr = this.data;
+	var dataArrayLen = dataArr.length;
+	var imageArrayLen = dataArrayLen * 4;
+	var offset;
+	
+	offset = 0;
+	for (var i = 0; i < dataArrayLen; i++) {
+		imageArr[offset] = this.redMultiply * dataArr[i] + this.redAdd;
+		offset = offset + 4;
+	}
+
+	offset = 1;
+	for (var i = 0; i < dataArrayLen; i++) {
+		imageArr[offset] = this.greenMultiply * dataArr[i] + this.greenAdd;
+		offset = offset + 4;
+	}
+
+	offset = 2;
+	for (var i = 0; i < dataArrayLen; i++) {
+		imageArr[offset] = this.blueMultiply * dataArr[i] + this.blueAdd;
+		offset = offset + 4;
+	}
+
+	offset = 3;
+	for (var i = 0; i < dataArrayLen; i++) {
+		if (dataArr[i] !== undefined) {
+			imageArr[offset] = 255;
+		}
+		offset = offset + 4;
+	}
+
+	context.putImageData(imageData, this.x, this.y);
+}
+
+GreyPixelList.prototype.isHit = function (context, scale, x, y) {
+	return x >= this.x && x < this.x + this.width && y >= this.y && y < this.y + this.height &&
+	this.data[(y - this.y) * this.width + x - this.x] !== undefined;
+}
+
+
+GreyPixelList.prototype.toString = function() {
+	var s = "GreyPixelList(";
+	if (this.name !== undefined) {
+		s = s + Eden.edenCodeForValue(this.name) + ", ";
+	}
+	s = s + Eden.edenCodeForValues(this.ptr, this.x, this.y, this.width, this.redMultiply,
+		this.redAdd, this.greenMultiply, this.greenAdd, this.blueMultiply, this.blueAdd) + ")";
+	return s;
+}
+
+GreyPixelList.prototype.getEdenCode = GreyPixelList.prototype.toString;
+
+}}$;

@@ -1,0 +1,92 @@
+## Copyright (c) 2015, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+##Example:
+/**
+ * Creates a LinearGradient that can be used to colour shapes
+ * @param x1 X-coordinate for start
+ * @param y1 Y-coordinate for start
+ * @param x2 X-coordinate for end
+ * @param y2 Y-coordinate for end
+ * @param [start_colour Start Colour
+ * @param end_colour] End Colour
+ * @param [extra_colour_stops] A list of two item lists.  The first element of each is a point along the gradient (0.0-1.0).  The second is the colour.
+ * 
+ * Usage example: 
+ * 
+ * ```
+ * 	x = 50;
+ * 	y = 50;
+ * 	width = 400;
+ * 	height = 250;
+ * 	gradient is LinearGradient(x, y, x + width, y + height, "cyan", "blue");
+ * 	rect is Rectangle(x, y, width, height, gradient);
+ * 	picture is [rect];
+ * ```
+ * #canvas #colour #gradient #lineargradient
+*/
+
+func LinearGradient {
+	${{
+		var x1 = arguments[0];
+		var y1 = arguments[1];
+		var x2 = arguments[2];
+		var y2 = arguments[3];
+		var colourStops;
+		if (Array.isArray(arguments[4])) {
+			colourStops = arguments[4];
+		} else {
+			if (Array.isArray(arguments[6])) {
+				colourStops = arguments[6];
+			} else {
+				colourStops = [];
+			}
+			
+			var start_colour = arguments[4];
+			if (typeof(start_colour) != "string") {
+				start_colour = "black";
+			}
+			
+			var end_colour = arguments[5];
+			if (typeof(end_colour) != "string") {
+				end_colour = "white";
+			}
+			
+			colourStops.push([0, start_colour]);
+			colourStops.push([1, end_colour]);
+		}
+		return new LinearGradient(x1, y1, x2, y2, colourStops);
+	}}$;
+}
+
+${{
+	LinearGradient = function(x1, y1, x2, y2, colourStops) {
+		this.x1 = x1;
+		this.y1 = y1;
+		this.x2 = x2;
+		this.y2 = y2;
+		this.colourStops = colourStops;
+	}
+	
+	LinearGradient.prototype = new EdenUI.plugins.Canvas2D.FillStyle();
+	
+	LinearGradient.prototype.getColour = function (context) {
+		var gradient = context.createLinearGradient(this.x1, this.y1, this.x2, this.y2);
+		var colourStop;
+		for (var i = 0; i < this.colourStops.length; i++) {
+			colourStop = this.colourStops[i];
+			gradient.addColorStop(colourStop[0], colourStop[1]);
+		}
+		return gradient;
+	};
+
+	LinearGradient.prototype.toString = function() {
+		return "LinearGradient(" + Eden.edenCodeForValues(this.x1, this.y1, this.x2, this.y2, this.colourStops) + ")";
+		
+	};
+
+	LinearGradient.prototype.getEdenCode = LinearGradient.prototype.toString;
+
+}}$;

@@ -1,0 +1,182 @@
+## Copyright (c) 2013, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+##Taints the canvas if the file is located on another domain.
+
+${{
+CanvasImage = function (name, dx, dy, dWidth, dHeight, sx1, sy1, sx2, sy2, smoothed, file) {
+	this.name = edenUI.plugins.Canvas2D.initZoneFromName(name, "Image");
+	this.obsName = root.currentObservableName();
+
+	var temp;
+	if (sx2 !== undefined) {
+		if (sx1 > sx2) {
+			temp = sx1;
+			sx1 = sx2;
+			sx2 = temp;
+		}
+		this.sWidth = sx2 - sx1;
+	}
+	if (sy2 !== undefined) {
+		if (sy1 > sy2) {
+			temp = sy1;
+			sy1 = sy2;
+			sy2 = temp;
+		}
+		this.sHeight = sy2 - sy1;
+	}
+
+	this.originalDWidth = dWidth;
+	this.originalDHeight = dHeight;
+	this.originalSX2 = sx2;
+	this.originalSY2 = sy2;
+	
+	this.dx = dx;
+	this.dy = dy;
+	this.dWidth = dWidth;
+	this.dHeight = dHeight;
+	this.sx = sx1;
+	this.sy = sy1;
+	this.smoothed = smoothed;
+
+	this.image = new Image();
+	//this.image.setAttribute("crossorigin","anonymous");	
+	this.canvasesToRepaint = {};
+	this.loaded = false;
+	
+	var me = this;
+	
+	this.image.onload = function() {
+		if (me.sWidth === undefined) {
+			me.sWidth = me.image.width - me.sx;
+		}
+		if (me.sHeight === undefined) {
+			me.sHeight = me.image.height - me.sy;
+		}
+		if (me.dWidth === undefined && me.dHeight === undefined) {
+			me.dWidth = me.sWidth;
+			me.dHeight = me.sHeight;		
+		} else if (me.dWidth === undefined) {
+			me.dWidth = me.sWidth * me.dHeight / me.sHeight;
+		} else if (me.dHeight === undefined) {
+			me.dHeight = me.sHeight * me.dWidth / me.sWidth;
+		}
+
+		me.loaded = true;
+		for (var viewName in me.canvasesToRepaint) {
+			edenUI.plugins.Canvas2D.drawPicture(viewName);
+		}
+	}
+	this.image.src = file;
+};
+}}$;
+
+/**
+ * Creates an image element for display on the canvas together with the
+ * geometric shapes.  Taints the canvas if url is located on another domain.
+ *   @param [name]
+ *   @param x X-coordinate
+ *   @param y Y-coordinate
+ *   @param [width] Width in pixels
+ *   @param [height] Height in pixels
+ *   @param [clip_left]
+ *   @param [clip_top]
+ *   @param [clip_right]
+ *   @param [clip_bottom]
+ *   @param [smoothed]
+ *   @param url Source file for the image
+ *   #canvas
+ *   #library
+ */
+func Image {
+	${{
+		var numArgs = arguments.length;
+		var argsProcessed;
+		var name;
+		if (typeof(arguments[0]) == "string") {
+			name = arguments[0];
+			argsProcessed = 1;
+		} else {
+			argsProcessed = 0;
+		}
+
+		var dx = arguments[argsProcessed];
+		argsProcessed++;
+		var dy = arguments[argsProcessed];
+		argsProcessed++;
+
+		var dWidth, dHeight, sx1 = 0, sy1 = 0, sx2, sy2, smoothed = true, file;
+
+		if (numArgs - 1 > argsProcessed) {
+			dWidth = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			dHeight = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			sx1 = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			sy1 = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			sx2 = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			sy2 = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		if (numArgs - 1 > argsProcessed) {
+			smoothed = arguments[argsProcessed];
+			argsProcessed++;
+		}
+		file = arguments[numArgs - 1];
+		return new CanvasImage(name, dx, dy, dWidth, dHeight, sx1, sy1, sx2, sy2, smoothed, file);
+	}}$;
+}
+
+${{
+CanvasImage.prototype.draw = function(context, scale, viewName) {
+	if (this.loaded) {
+		var smoothed = this.smoothed;
+		context.mozImageSmoothingEnabled = smoothed;
+		context.msImageSmoothingEnabled = smoothed;
+		context.imageSmoothingEnabled = smoothed;
+		if (scale > 0) {
+			context.drawImage(this.image, this.sx, this.sy, this.sWidth, this.sHeight, this.dx, this.dy, this.dWidth, this.dHeight);
+		} else {
+			if (!this.flippedImage) {
+				var buffer = document.createElement("canvas");
+				buffer.width = this.dWidth;
+				buffer.height = this.dHeight;
+				var bufferContext = buffer.getContext("2d");
+				bufferContext.scale(1, -1);
+				bufferContext.drawImage(this.image, this.sx, this.sy, this.sWidth, this.sHeight, 0, -this.dHeight, this.dWidth, this.dHeight);
+				this.flippedImage = buffer;
+			}
+			context.drawImage(this.flippedImage, this.dx, this.dy - this.dHeight);
+		}
+	} else {
+		this.canvasesToRepaint[viewName] = true;
+	}
+};
+
+CanvasImage.prototype.isHit = function (context, scale, x, y) {
+	return x >= this.dx && x < this.dx + this.dWidth && y >= this.dy && y < this.dy + this.dHeight;
+}
+
+CanvasImage.prototype.toString = function() {
+  return "Image(" +	Eden.edenCodeForValues(this.dx, this.dy, this.originalDWidth,
+	this.originalDHeight, this.sx, this.sy, this.originalSX2, this.originalSY2, this.smoothed, this.image.src) + ")";
+};
+
+CanvasImage.prototype.getEdenCode = CanvasImage.prototype.toString;
+
+}}$;

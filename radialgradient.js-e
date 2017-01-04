@@ -1,0 +1,72 @@
+## Copyright (c) 2015, Empirical Modelling Group
+## All rights reserved.
+##
+## See LICENSE.txt
+
+##Example:
+
+/*
+ * Creates a radial gradient that can be used to colour shapes
+ * 
+ * @param x
+ * @param y
+ * @param [r radius
+ * @param [colourStops]] List of colourStops
+ * 
+ * ```
+ * g is RadialGradient(300, 240, 230, [[0, "red"], [0.5, "orange"], [1, "cyan"]]);
+ * c is Circle(300,240,230,g);
+ * picture is [c];
+ * ```
+ */
+	
+func RadialGradient {
+	${{
+		var x1, y1, r1, x2, y2, r2, colourStops;
+		x1 = arguments[0];
+		y1 = arguments[1];
+		
+		switch (arguments.length) {
+			case 4:
+				r1 = 0;
+				x2 = x1;
+				y2 = y1;
+				r2 = arguments[2];
+				colourStops = arguments[3];
+				break;
+		}
+		return new RadialGradient(x1, y1, r1, x2, y2, r2, colourStops);
+	}}$;
+}
+
+${{
+	RadialGradient = function(x1, y1, r1, x2, y2, r2, colourStops) {
+		this.x1 = x1;
+		this.y1 = y1;
+		this.r1 = r1;
+		this.x2 = x2;
+		this.y2 = y2;
+		this.r2 = r2;
+		this.colourStops = colourStops;
+	}
+	
+	RadialGradient.prototype = new EdenUI.plugins.Canvas2D.FillStyle();
+
+	RadialGradient.prototype.getColour = function (context) {
+		var gradient = context.createRadialGradient(this.x1, this.y1, this.r1, this.x2, this.y2, this.r2);
+		var colourStop;
+		for (var i = 0; i < this.colourStops.length; i++) {
+			colourStop = this.colourStops[i];
+			gradient.addColorStop(colourStop[0], colourStop[1]);
+		}
+		return gradient;
+	};
+
+	RadialGradient.prototype.toString = function() {
+		return "RadialGradient(" + Eden.edenCodeForValues(this.x1, this.y1, this.r1, this.x2, this.y2, this.r2, this.colourStops) + ")";
+		
+	};
+
+	RadialGradient.prototype.getEdenCode = RadialGradient.prototype.toString;
+
+}}$;
